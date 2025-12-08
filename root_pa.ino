@@ -154,11 +154,11 @@ void TaskInternet(void *pvParameters) {
              // Node 2 (LED Only)
              else if (nodeId == 4267557053) { 
                Blynk.virtualWrite(V4, noise);
-               Blynk.virtualWrite(V2, nodeId);
+               Blynk.virtualWrite(V5, nodeId);
              }
              // Unknown Nodes (Optional fallback)
              else {
-               Blynk.virtualWrite(V2, nodeId);
+               Blynk.virtualWrite(V5, nodeId);
              }
            }
 
