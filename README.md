@@ -1,6 +1,10 @@
 # Quiet Mapper — IoT Final Project Report
 
 **Group 14** · Department of Electrical Engineering · Universitas Indonesia
+- Fadhlureza Sebastian		2306161971
+- Fido Wahyu C			      2306250674
+- M Arya Wiandra Utomo		2306218295
+- Shafwan Hasyim			    2306209113
 
 ***
 
@@ -104,3 +108,4 @@ Quiet Mapper successfully demonstrates a Mesh Network IoT system for real-time m
 2. DigiLab DTE — IoT Platforms: Blynk & Node-RED
 3. Circuit Digest — KY-038 Sound Sensor with ESP32
 4. Random Nerd Tutorials — MPU-6050 with ESP32
+
