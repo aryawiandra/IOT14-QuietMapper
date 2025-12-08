@@ -105,8 +105,9 @@ Quiet Mapper successfully demonstrates a Mesh Network IoT system for real-time m
 ***
 
 ## References
-[1] DigiLab DTE, "Module 10: Mesh," in Internet of Things, Learn DigiLab DTE. [Online]. Available: https://learn.digilabdte.com/books/internet-of-things/chapter/module-10-mesh. [Accessed: Dec. 8, 2025].
-[2] DigiLab DTE, "Module 9: IoT Platforms (Blynk and Red Node)," in Internet of Things, Learn DigiLab DTE. [Online]. Available: https://learn.digilabdte.com/books/internet-of-things/chapter/module-9-iot-platforms-blynk-and-red-node. [Accessed: Dec. 8, 2025].
-[3] Circuit Digest, "Interface KY-038 Sound Sensor with ESP32," Circuit Digest. [Online]. Available: https://circuitdigest.com/microcontroller-projects/interface-ky038-sound-sensor-with-esp32. [Accessed: Dec. 8, 2025].
-[4] R. Santos, "ESP32 MPU-6050 Accelerometer and Gyroscope with Arduino IDE," Random Nerd Tutorials. [Online]. Available: https://randomnerdtutorials.com/esp32-mpu-6050-accelerometer-gyroscope-arduino/. [Accessed: Dec. 8, 2025].
+[1] DigiLab DTE, "Module 10: Mesh," in Internet of Things, Learn DigiLab DTE. [Online]. Available: https://learn.digilabdte.com/books/internet-of-things/chapter/module-10-mesh. [Accessed: Dec. 8, 2025].    
+[2] DigiLab DTE, "Module 9: IoT Platforms (Blynk and Red Node)," in Internet of Things, Learn DigiLab DTE. [Online]. Available: https://learn.digilabdte.com/books/internet-of-things/chapter/module-9-iot-platforms-blynk-and-red-node. [Accessed: Dec. 8, 2025].      
+[3] Circuit Digest, "Interface KY-038 Sound Sensor with ESP32," Circuit Digest. [Online]. Available: https://circuitdigest.com/microcontroller-projects/interface-ky038-sound-sensor-with-esp32. [Accessed: Dec. 8, 2025].      
+[4] R. Santos, "ESP32 MPU-6050 Accelerometer and Gyroscope with Arduino IDE," Random Nerd Tutorials. [Online]. Available: https://randomnerdtutorials.com/esp32-mpu-6050-accelerometer-gyroscope-arduino/. [Accessed: Dec. 8, 2025].      
+
 
