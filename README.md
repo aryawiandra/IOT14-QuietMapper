@@ -1,10 +1,13 @@
 # Quiet Mapper — IoT Final Project Report
 
 **Group 14** · Department of Electrical Engineering · Universitas Indonesia
-- Fadhlureza Sebastian		2306161971
-- Fido Wahyu C			      2306250674
-- M Arya Wiandra Utomo		2306218295
-- Shafwan Hasyim			    2306209113
+
+| Name | NPM |
+| :--- | :--- |
+| Fadhlureza Sebastian | 2306161971 |
+| Fido Wahyu Choirulinsan | 2306250674 |
+| M Arya Wiandra Utomo | 2306218295 |
+| Shafwan Hasyim | 2306209113 |
 
 ***
 
@@ -52,11 +55,11 @@ Each node is built with:
 
 The architecture uses **FreeRTOS** with **SMP** on ESP32, plus a Deep Sleep state machine for efficiency.
 
-#### Root Node (Gateway)
-- **TaskInternet – Core 0:** WiFi, MQTT, Blynk, Queue processing
-- **TaskMesh – Core 1:** Mesh networking, $1.5s$ beaconing, data transmission and reception
+#### Root Node (Gateway - $root\_pa.ino$)
+- **TaskInternet – Core 0 (Low Priority):** WiFi, MQTT, Blynk, Queue processing
+- **TaskMesh – Core 1 (High Priority):** Mesh networking, $1.5s$ beaconing (WAKE/SLEEP), data transmission and reception
 
-#### End Node (`node_pa.ino`)
+#### End Node ($node\_pa.ino$)
 - Reads **`isWorkMode`** from RTC Memory upon wake
 - **Work Mode:** samples sensors, broadcasts readings, listens for SLEEP
 - **Silent Mode:** disables sensors and OLED, listens only for **WAKE**
@@ -73,12 +76,10 @@ Integration tests included:
 ## Testing and Evaluation
 
 ### Testing
-Testing covered unit tests, RTOS synchronization (Mutex/Queue), full integration, and end-to-end system validation. The table below details the acceptance criteria activities tested.
+Testing covered unit tests, RTOS synchronization (Mutex/Queue), full integration, and end-to-end system validation.
 
 | Activity | Results | Passed? |
 | :--- | :--- | :--- |
-| **Noise & Vibration Accuracy** | Average reading deviation from SLM must be $< 10\%$. Refresh Rate: $1$ reading/minute/node. | V |
-| **Mesh Network Reliability** | Packet Loss Rate (PLR) at the Gateway must be $< 5\%$. | V |
 | **State Persistence (RTC Memory)** | Node must immediately resume "Active Work Mode" (OLED ON) without an external command, confirming state persistence. | V |
 | **Remote Network Control** | All End Nodes must receive the command, update their state, and successfully enter Deep Sleep. | V |
 | **Deep Sleep Power Management** | Current consumption reduction in "Silent Check Mode" must achieve **at least $80\%$**. | V |
@@ -108,4 +109,3 @@ Quiet Mapper successfully demonstrates a Mesh Network IoT system for real-time m
 2. DigiLab DTE — IoT Platforms: Blynk & Node-RED
 3. Circuit Digest — KY-038 Sound Sensor with ESP32
 4. Random Nerd Tutorials — MPU-6050 with ESP32
-
