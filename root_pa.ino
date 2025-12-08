@@ -1,7 +1,7 @@
 // ==========================================
-// ROOT FINAL - FIXED NODE ID TYPE
+// ROOT FINAL - RTOS BEACON (FIXED ID TYPE)
 // ==========================================
-// 1. CONFIG BLYNK (WAJIB PALING ATAS)
+// 1. CONFIG BLYNK
 #define BLYNK_PRINT Serial
 #define BLYNK_TEMPLATE_ID   "TMPL6gJnYJIQa"
 #define BLYNK_TEMPLATE_NAME "Library Mesh Monitor"
@@ -14,8 +14,8 @@
 #include <ArduinoJson.h>
 
 // 2. CONFIG WIFI & MQTT
-const char* ssid     = "fadhlureza";
-const char* pass     = "acebkutek";
+const char* ssid        = "fadhlureza";
+const char* pass        = "acebkutek";
 const char* mqtt_server = "broker.hivemq.com";
 const char* mqtt_topic  = "kampus/library/kelompok14/data";
 
@@ -24,15 +24,26 @@ const char* mqtt_topic  = "kampus/library/kelompok14/data";
 #define   MESH_PASSWORD   "12345678"
 #define   MESH_PORT       7777
 
+// --- OBJECTS ---
 painlessMesh  mesh;
 WiFiClient    espClient;
 PubSubClient  mqttClient(espClient);
 
-// STATUS GLOBAL
-bool isSystemActive = true; 
+// --- RTOS & QUEUE ---
+TaskHandle_t TaskMeshHandle;
+TaskHandle_t TaskInternetHandle;
+QueueHandle_t msgQueue;
+
+// Struct to send data from Mesh Task -> Internet Task
+struct NodeMessage {
+  char payload[512]; // Buffer for JSON string
+};
+
+// --- GLOBAL STATE ---
+volatile bool isSystemActive = true; 
 unsigned long lastBroadcast = 0;
 
-// --- FUNGSI BROADCAST STATUS ---
+// --- HELPER: BROADCAST STATUS (BEACON) ---
 void broadcastStatus() {
   DynamicJsonDocument doc(256);
   doc["cmd"] = isSystemActive ? "WAKE" : "SLEEP"; 
@@ -41,116 +52,160 @@ void broadcastStatus() {
   mesh.sendBroadcast(msg);
 }
 
-// --- FUNGSI TOMBOL BLYNK (V3) ---
+// --- CALLBACK: MESH RECEIVED ---
+void receivedCallback(uint32_t from, String &msg) {
+  // Don't process Internet stuff here (it blocks mesh).
+  // Send to Queue instead.
+  NodeMessage data;
+  msg.toCharArray(data.payload, 512);
+  
+  // Send to Queue with 0 wait time (if full, drop packet to keep mesh fast)
+  xQueueSend(msgQueue, &data, 0);
+  
+  Serial.printf("MESH RX: %s\n", data.payload);
+}
+
+// --- BLYNK CALLBACK ---
 BLYNK_WRITE(V3) {
   int value = param.asInt(); 
   if (value == 1) {
     isSystemActive = true;
-    Serial.println(">>> BLYNK CMD: ON (Membangunkan Sistem)");
+    Serial.println(">>> BLYNK CMD: ON");
   } else {
     isSystemActive = false;
-    Serial.println(">>> BLYNK CMD: OFF (Menidurkan Sistem)");
+    Serial.println(">>> BLYNK CMD: OFF");
   }
+  // Force immediate broadcast
   broadcastStatus();
 }
 
-// --- CALLBACK SAAT TERIMA DATA ---
-void receivedCallback(uint32_t from, String &msg) {
-  DynamicJsonDocument doc(1024);
-  DeserializationError error = deserializeJson(doc, msg);
-  
-  // FILTER 1: Pastikan JSON valid
-  if (!error && doc.containsKey("noise")) { 
-    
-    // PERBAIKAN PENTING: Gunakan uint32_t, bukan int!
-    // Agar ID 4 Milyar (4267557053) muat dan tidak error.
-    uint32_t nodeId = doc["node"]; 
-    int noise       = doc["noise"];
-    float vib       = doc["vib"];
-    
-    // FILTER 2: Debug hanya jika ID valid
-    if (nodeId != 0) {
-       Serial.printf("Node %u: Noise %d\n", nodeId, noise);
+// ==========================================
+// RTOS TASK 1: MESH & BEACON (Priority 2 - High)
+// ==========================================
+void TaskMesh(void *pvParameters) {
+  for (;;) {
+    mesh.update();
 
-       if (Blynk.connected()) {
-           // --- PEMISAH DATA NODE ---
-           
-           // Node 1 (Lengkap OLED/Gyro) -> V0 & V1
-           if (nodeId == 135941613) { 
-               Blynk.virtualWrite(V0, noise);
-               Blynk.virtualWrite(V1, vib);
-               Blynk.virtualWrite(V2, nodeId); // String ID ke V2
-           }
-           // Node 2 (Cuma LED) -> Masukkan ke V4
-           else if (nodeId == 4267557053) { 
-               Blynk.virtualWrite(V4, noise);  // Noise Node 2 ke V4
-               Blynk.virtualWrite(V2, nodeId); // Update ID terakhir
-           }
-       }
-       
-       if (mqttClient.connected()) {
-           mqttClient.publish(mqtt_topic, msg.c_str());
-       }
+    // --- BEACON LOGIC ---
+    // Broadcast status every 1.5 seconds.
+    // This allows waking nodes to catch the signal quickly.
+    if (millis() - lastBroadcast > 1500) {
+      lastBroadcast = millis();
+      broadcastStatus();
     }
+
+    vTaskDelay(1 / portTICK_PERIOD_MS); 
   }
 }
 
+// ==========================================
+// RTOS TASK 2: INTERNET (Priority 1 - Low)
+// ==========================================
+void TaskInternet(void *pvParameters) {
+  
+  // Setup MQTT & Blynk
+  mqttClient.setServer(mqtt_server, 1883);
+  Blynk.config(BLYNK_AUTH_TOKEN);
+
+  for (;;) {
+    // 1. Connection Handling
+    if (WiFi.status() == WL_CONNECTED) {
+      // Blynk
+      if (Blynk.connected()) Blynk.run();
+      else {
+        static unsigned long lastBlynk = 0;
+        if (millis() - lastBlynk > 5000) { lastBlynk = millis(); Blynk.connect(); }
+      }
+
+      // MQTT
+      if (mqttClient.connected()) mqttClient.loop();
+      else {
+        static unsigned long lastMqtt = 0;
+        if (millis() - lastMqtt > 5000) { 
+           lastMqtt = millis(); 
+           String clientId = "Root_" + String(random(0xffff), HEX);
+           mqttClient.connect(clientId.c_str()); 
+        }
+      }
+    }
+
+    // 2. Process Queue (Mesh -> Internet)
+    NodeMessage incomingData;
+    if (xQueueReceive(msgQueue, &incomingData, 0) == pdTRUE) {
+      String msg = String(incomingData.payload);
+      DynamicJsonDocument doc(1024);
+      DeserializationError error = deserializeJson(doc, msg);
+
+      if (!error && doc.containsKey("noise")) {
+        // USE uint32_t FOR NODE ID
+        uint32_t nodeId = doc["node"]; 
+        int noise       = doc["noise"];
+        float vib       = doc["vib"];
+
+        if (nodeId != 0) {
+           // --- SEND TO BLYNK ---
+           if (Blynk.connected()) {
+             // Node 1 (Full)
+             if (nodeId == 135941613) { 
+               Blynk.virtualWrite(V0, noise);
+               Blynk.virtualWrite(V1, vib);
+               Blynk.virtualWrite(V2, nodeId);
+             }
+             // Node 2 (LED Only)
+             else if (nodeId == 4267557053) { 
+               Blynk.virtualWrite(V4, noise);
+               Blynk.virtualWrite(V2, nodeId);
+             }
+             // Unknown Nodes (Optional fallback)
+             else {
+               Blynk.virtualWrite(V2, nodeId);
+             }
+           }
+
+           // --- SEND TO MQTT ---
+           if (mqttClient.connected()) {
+             mqttClient.publish(mqtt_topic, msg.c_str());
+           }
+        }
+      }
+    }
+    
+    // 3. Serial Manual Control
+    if (Serial.available()) {
+       String input = Serial.readStringUntil('\n');
+       input.trim(); input.toUpperCase();
+       if (input == "OFF") { isSystemActive = false; if(Blynk.connected()) Blynk.virtualWrite(V3, 0); }
+       if (input == "ON")  { isSystemActive = true;  if(Blynk.connected()) Blynk.virtualWrite(V3, 1); }
+    }
+
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+}
+
+// ==========================================
+// SETUP
+// ==========================================
 void setup() {
   Serial.begin(115200);
-
-  mesh.setDebugMsgTypes( ERROR | CONNECTION ); 
-  mesh.init( MESH_PREFIX, MESH_PASSWORD, MESH_PORT );
   
+  // 1. Create Queue
+  msgQueue = xQueueCreate(10, sizeof(NodeMessage));
+
+  // 2. Init Mesh
+  mesh.setDebugMsgTypes(ERROR | STARTUP); 
+  mesh.init(MESH_PREFIX, MESH_PASSWORD, MESH_PORT);
   mesh.stationManual(ssid, pass); 
   mesh.setRoot(true);
   mesh.setContainsRoot(true); 
   mesh.onReceive(&receivedCallback);
 
-  Blynk.config(BLYNK_AUTH_TOKEN);
-  mqttClient.setServer(mqtt_server, 1883);
-  
-  Serial.println("ROOT SIAP. System Active: TRUE");
+  Serial.println(">>> ROOT RTOS STARTED");
+
+  // 3. Create Tasks
+  xTaskCreatePinnedToCore(TaskMesh, "MeshTask", 10000, NULL, 2, &TaskMeshHandle, 1);
+  xTaskCreatePinnedToCore(TaskInternet, "NetTask", 10000, NULL, 1, &TaskInternetHandle, 1);
 }
 
 void loop() {
-  mesh.update();
-
-  // 1. INPUT SERIAL
-  if (Serial.available()) {
-    String input = Serial.readStringUntil('\n');
-    input.trim(); input.toUpperCase();
-
-    if (input == "OFF") {
-      isSystemActive = false;
-      Serial.println(">>> SERIAL CMD: OFF");
-      if(Blynk.connected()) Blynk.virtualWrite(V3, 0);
-    } 
-    else if (input == "ON") {
-      isSystemActive = true;
-      Serial.println(">>> SERIAL CMD: ON");
-      if(Blynk.connected()) Blynk.virtualWrite(V3, 1);
-    }
-    broadcastStatus();
-  }
-
-  // 2. BROADCAST RUTIN
-  if (millis() - lastBroadcast > 2000) {
-    lastBroadcast = millis();
-    broadcastStatus();
-  }
-
-  // 3. INTERNET HANDLING
-  if(WiFi.status() == WL_CONNECTED) {
-     if (Blynk.connected()) Blynk.run();
-     else if(millis()%5000==0) Blynk.connect();
-
-     if (!mqttClient.connected()) {
-        if(millis()%5000==0) {
-           String clientId = "Root_" + String(random(0xffff), HEX);
-           mqttClient.connect(clientId.c_str());
-        }
-     } else {
-        mqttClient.loop();
-     }
-  }
+  vTaskDelete(NULL);
 }
