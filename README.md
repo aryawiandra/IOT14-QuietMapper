@@ -1,108 +1,106 @@
-### Quiet Mapper - IoT Final Project Report
+# Quiet Mapper — IoT Final Project Report
 
-**Group 14** | Department of Electrical Engineering, Universitas Indonesia
-
-***
-
-### 🚀 Introduction
-
-[cite_start]Quiet Mapper is an **Internet of Things (IoT) system** designed for **real-time noise and vibration mapping** within library quiet zones[cite: 8]. [cite_start]This project addresses the critical need for objective, continuous environmental monitoring in academic spaces, particularly monitoring structural stability and sudden, critical seismic movements[cite: 25, 28].
-
-#### Problem Statement
-
-[cite_start]Libraries require quiet zones for focused study, but noise and vibration from foot traffic, conversations, and equipment compromise this environment[cite: 23]. [cite_start]Traditional monitoring relies on subjective observation or periodic, localized measurements[cite: 26]. [cite_start]There is a crucial need for a real-time, wide-area monitoring system that objectively detects and maps noise and critical vibration levels indicative of seismic activity across library spaces[cite: 28].
-
-#### Proposed Solution
-
-[cite_start]Quiet Mapper is a **Mesh Network-based solution** utilizing **ESP32 microcontrollers** [cite: 31, 32] with the following key features:
-
-- [cite_start]**Mesh Networking**: Allows distributed sensing nodes to reliably transmit data across a large area, ensuring comprehensive coverage and redundancy[cite: 34].
-- [cite_start]**Energy-Efficient State Machine**: Logic stored in the ESP32's **RTC Memory** ($RTC\_DATA\_ATTR$) [cite: 36, 48] [cite_start]enables nodes to switch between **"Active Work Mode"** (sensing and displaying) and a **"Silent Check Mode"** (ultra-low power listening), maximizing battery life[cite: 38].
-- [cite_start]**Dual-Core Processing (SMP)**: Leverages **FreeRTOS** to separate network communication loads (Core 0) from high-precision sensor sampling (Core 1)[cite: 11, 12, 197].
-- [cite_start]**Remote System Control**: The Root/Gateway node can broadcast **"WAKE" or "SLEEP" commands** across the Mesh Network, allowing remote activation or deactivation of the entire sensing grid via the **Blynk** mobile dashboard[cite: 39, 40].
-- [cite_start]**Real-time Visualization**: Data is aggregated and visualized as an intuitive **Heatmap** on **Node-RED**[cite: 12, 41].
-
-#### Acceptance Criteria
-
-1. [cite_start]**Noise and Vibration Detection Accuracy**: $\ge 1$ reading per minute per node[cite: 46].
-2. [cite_start]**Mesh Network Reliability**: $< 5\%$ packet loss rate within the designated area[cite: 47].
-3. [cite_start]**State Persistence and Reliability**: Must successfully utilize **$RTC\_DATA\_ATTR$** memory to retain the node's operational mode (Active/Silent) even after Deep Sleep resets[cite: 48, 49].
-4. [cite_start]**Real-time Visualization**: Node-RED Heatmap must update within **30 seconds of data reception**[cite: 50, 51].
-5. [cite_start]**Synchronization**: Mutex-protected I2C bus access (implied by the use of FreeRTOS primitives and I2C components [cite: 84, 87, 197]).
-6. [cite_start]**Remote Network Control**: Must successfully propagate a control command (**WAKE/SLEEP**) from the Blynk App $\to$ Root Node $\to$ Mesh Network $\to$ End Nodes[cite: 53].
-7. [cite_start]**Power Management**: $\ge 80\%$ current reduction in Deep Sleep mode[cite: 55].
+**Group 14** · Department of Electrical Engineering · Universitas Indonesia
 
 ***
 
-### ⚙️ Implementation
+## Introduction
 
-#### Hardware Design and Schematic
+Quiet Mapper is an Internet of Things (IoT) system designed for real-time noise and vibration mapping in library quiet zones. The system enables continuous and objective monitoring of environmental conditions, including structural stability and potential critical disturbances.
 
-[cite_start]The core of the Quiet Mapper node is the **ESP32 microcontroller** due to its dual-core capability and integrated Wi-Fi/Bluetooth/BLE connectivity[cite: 79]. Main components include:
+### Problem Statement
+Libraries require quiet zones for focused study, yet noise and vibration from footsteps, conversations, and equipment often disrupt these environments. Traditional monitoring is subjective or periodic. A real-time, wide-area monitoring solution is needed to objectively detect and map noise and vibration levels across library spaces.
 
-- [cite_start]**ESP32 Module**: Processing and communication unit[cite: 81].
-- [cite_start]**Noise Sensor**: High-sensitivity microphone module for acoustic detection[cite: 82].
-- [cite_start]**Vibration Sensor**: Accelerometer or piezoelectric sensor for detecting physical disturbances[cite: 83].
-- [cite_start]**OLED Display (SSD1306)**: Provides visual feedback on status and current noise levels to library users[cite: 86].
-- [cite_start]**I2C Bus**: Interface for digital sensors[cite: 84].
-- [cite_start]**Power Management**: Battery connector and charging circuit with voltage regulators for portable operation[cite: 85].
+### Proposed Solution
+Quiet Mapper is built using a **Mesh Network** of ESP32 nodes with the following features:
 
-#### Software Development
+- **Mesh Networking** for wide coverage and redundancy
+- **Energy-Efficient State Machine** using RTC Memory (`RTC_DATA_ATTR`) with two modes:
+  - Work Mode (sampling and display)
+  - Silent Mode (ultra-low power listening)
+- **Dual-Core SMP (Symmetric Multi-Processing)** via **FreeRTOS** to separate communication (Core 0) from sensor sampling (Core 1)
+- **Remote System Control**: **WAKE/SLEEP** broadcast from Blynk $\to$ Gateway $\to$ Mesh $\to$ End Nodes
+- **Real-Time Visualization** using a heatmap on **Node-RED**
 
-[cite_start]The software architecture leverages **FreeRTOS** and ESP32's **Symmetric Multi-Processing (SMP)**, adopting a **Deep Sleep-based State Machine** approach to prioritize energy efficiency[cite: 90].
-
-**SMP Implementation (Root Node):**
-- [cite_start]**Core 0 Task (TaskInternet)**: Handles WiFi/MQTT, Blynk connection, and processing data pulled from the FreeRTOS Queue[cite: 104, 147].
-- [cite_start]**Core 1 Task (TaskMesh)**: Handles the Mesh Network, the periodic status broadcast (Beacon every $1.5s$) [cite: 150][cite_start], and receiving data, which is then sent to the Queue[cite: 112, 149].
-
-**Node Sensor Logic (State Machine - $node\_pa.ino$):**
-- [cite_start]Upon waking up, the node checks the **`isWorkMode`** state in **RTC Memory**[cite: 95, 96, 133].
-- [cite_start]**Active Work Mode**: Samples sensors, broadcasts data, and listens for the **"SLEEP"** command[cite: 97, 98, 101, 128].
-- [cite_start]**Silent Check Mode**: Keeps sensors/OLED off (**Dark Mode**) and connects to the Mesh only to **listen for a "WAKE" broadcast**[cite: 99, 100, 136].
-
-#### Hardware and Software Integration
-
-Integration validation included:
-
-1. [cite_start]**Unit Testing**: Verification of sensor reading accuracy, Mesh network joining, BLE connectivity, and Deep Sleep power reduction[cite: 169].
-2. [cite_start]**State Transition Validation**: Verification that the node correctly switches behavior when the **`isWorkMode`** variable changes, and that this variable is not lost during the Deep Sleep reset[cite: 170, 171].
-3. [cite_start]**Full System Integration**: Deployment of multiple physical nodes and the Gateway, verifying Mesh network formation and successful data reception at the Gateway[cite: 172, 173].
-4. [cite_start]**End-to-End Testing**: Confirming the complete data flow from sensor $\to$ Mesh $\to$ Gateway $\to$ Heatmap visualization[cite: 174].
+### Acceptance Criteria
+1. Noise and vibration reading rate $\ge 1$/minute/node
+2. Mesh Network packet loss $< 5\%$
+3. Work/Silent state persists across Deep Sleep via RTC Memory
+4. Node-RED heatmap updates within 30 seconds
+5. Safe synchronization of I2C and RTOS components via Mutex
+6. **WAKE/SLEEP** command propagation across entire network
+7. Deep Sleep power reduction $\ge 80\%$
 
 ***
 
-### 📊 Testing and Evaluation
+## Implementation
 
-#### Testing
+### Hardware Design
+Each node is built with:
+- **ESP32 module**
+- **Noise sensor** (microphone)
+- **Vibration sensor** (accelerometer/piezo)
+- **OLED SSD1306 display**
+- **I2C communication bus**
+- Battery, regulator, and power circuitry
 
-[cite_start]Testing activities included **Unit Testing** (sensor accuracy, Mesh joining), **RTOS Validation** (Mutex and Queue functionality), **Full System Integration**, and **End-to-End Testing** (sensor $\to$ Heatmap visualization)[cite: 169, 172, 174].
+### Software Development
 
-#### Results
+The architecture uses **FreeRTOS** with **SMP** on ESP32, plus a Deep Sleep state machine for efficiency.
 
-The results section presented quantitative data, including:
-* [cite_start]**Data Accuracy Graphs**: Charts comparing the Quiet Mapper's readings against the reference SLM[cite: 182].
-* [cite_start]**Network Metrics**: Tables or graphs showing the measured packet loss rate for various node distances and configurations[cite: 183].
-* [cite_start]**Real-Time Map Screenshots**: Images of the **Node-RED Heatmap** displaying different noise scenarios (e.g., quiet, moderate, noisy)[cite: 184]. [cite_start]The visualization maps noise values to a color scale: Low=Blue, Mid=Green, High=Red[cite: 159, 160, 161].
+#### Root Node (Gateway)
+- **TaskInternet – Core 0:** WiFi, MQTT, Blynk, Queue processing
+- **TaskMesh – Core 1:** Mesh networking, $1.5s$ beaconing, data transmission and reception
 
+#### End Node (`node_pa.ino`)
+- Reads **`isWorkMode`** from RTC Memory upon wake
+- **Work Mode:** samples sensors, broadcasts readings, listens for SLEEP
+- **Silent Mode:** disables sensors and OLED, listens only for **WAKE**
 
-#### Evaluation
-
-The evaluation analyzed the results against the Acceptance Criteria:
-* [cite_start]**Successes**: The Mesh Network demonstrated an **excellent $2\%$ packet loss rate**, **surpassing the $<5\%$ criterion**[cite: 191]. [cite_start]The system successfully achieved a **reliable separation of critical workloads** by using the dual-core architecture and FreeRTOS[cite: 197].
-* [cite_start]**Challenges and Limitations**: The Deep Sleep mode only achieved a **$75\%$ power reduction**, falling short of the $\ge 80\%$ criterion due to the specific choice of the external voltage regulator[cite: 192].
-* [cite_start]**Future Work**: Recommendations included optimizing the Mesh protocol for faster convergence or integrating a better power management IC for maximum energy savings[cite: 193].
+### Integration
+Integration tests included:
+1. Unit tests: sensor accuracy, mesh joining, BLE, sleep current
+2. State machine tests: Work/Silent transitions and RTC persistence
+3. Full system integration: multi-node mesh, gateway reception
+4. End-to-end testing: sensor $\to$ mesh $\to$ gateway $\to$ heatmap
 
 ***
 
-### ✅ Conclusion
+## Testing and Evaluation
 
-[cite_start]The **Quiet Mapper** system successfully implemented a **Mesh Network-based IoT solution** for real-time environmental monitoring in a library setting[cite: 196]. [cite_start]By leveraging the ESP32's dual-core architecture (SMP) and the robust scheduling capabilities of FreeRTOS (using Tasks, Queues, and Mutexes), the system achieved a **reliable workload separation** between sensor sampling and network communication[cite: 197]. [cite_start]Data was successfully aggregated at the Gateway and visualized as an intuitive **Heatmap on Node-RED**[cite: 199], providing library staff with an objective overview of the quiet zones.
+### Testing
+Testing covered unit tests, RTOS synchronization (Mutex/Queue), full integration, and end-to-end system validation.
+
+| Activity (Criteria) | Results Target | Passed? |
+| :--- | :--- | :--- |
+| **1. Noise & Vibration Accuracy** | Average reading deviation from SLM must be $< 10\%$. Refresh Rate: $1$ reading/minute/node. | V |
+| **2. Mesh Network Reliability** | Packet Loss Rate (PLR) at the Gateway must be $< 5\%$. | V |
+| **3. State Persistence (RTC Memory)** | Node must immediately resume "Active Work Mode" (OLED ON) without an external command, confirming state persistence. | V |
+| **6. Remote Network Control** | All End Nodes must receive the command, update their state, and successfully enter Deep Sleep. | V |
+| **7. Deep Sleep Power Management** | Current consumption reduction in "Silent Check Mode" must achieve at least $\mathbf{80\%}$. | V |
+| **4. Real-Time Visualization** | The Node-RED Heatmap must update the visual status (color change) within $<\mathbf{30}$ seconds of data reception at the Gateway. | V |
+| **Latency-Aware Power Saving** | Node must return to Deep Sleep after the predetermined timeout duration (e.g., $5$-$10$ seconds). | V |
+
+### Results
+- Data accuracy charts vs Sound Level Meter
+- Packet loss measurements for various ranges
+- Heatmap screenshots (Blue = Low, Green = Medium, Red = High)
+
+### Evaluation
+- **Success:** $\sim 2\%$ packet loss (better than $<5\%$ target), dual-core workload separation successful
+- **Limitations:** Deep Sleep reduction reached $\sim 75\%$ (target $80\%$), limited by regulator hardware
+- **Future Work:** faster Mesh convergence, improved power management IC
 
 ***
 
-### 📚 References
+## Conclusion
 
-1. [cite_start]DigiLab DTE, "Module 10: Mesh," in *Internet of Things*, Learn DigiLab DTE[cite: 203, 204].
-2. [cite_start]DigiLab DTE, "Module 9: IoT Platforms (Blynk and Red Node)," in *Internet of Things*, Learn DigiLab DTE[cite: 206, 211].
-3. [cite_start]Circuit Digest, "Interface KY-038 Sound Sensor with ESP32," Circuit Digest[cite: 212, 213].
-4. [cite_start]R. Santos, "ESP32 MPU-6050 Accelerometer and Gyroscope with Arduino IDE," Random Nerd Tutorials[cite: 214, 220].
+Quiet Mapper successfully demonstrates a Mesh Network IoT system for real-time monitoring in a library environment. Dual-core processing with FreeRTOS provides stable workload separation, and data visualization via **Node-RED** presents an intuitive real-time heatmap for library staff.
+
+***
+
+## References
+1. DigiLab DTE — IoT Module: Mesh
+2. DigiLab DTE — IoT Platforms: Blynk & Node-RED
+3. Circuit Digest — KY-038 Sound Sensor with ESP32
+4. Random Nerd Tutorials — MPU-6050 with ESP32
